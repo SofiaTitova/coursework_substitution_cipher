@@ -78,8 +78,13 @@ def getFrequencyDict(text):
         D[chr(i+65)] =D[chr(i+65)]/len(text)
     return D
 
-def get_n_gramm(n, text):
+def smoothing(m, n):
+    p = (m + 1)/(n + 27**4)
+    return p
+
+def get_n_gramm(n, text, prob):
     D = {}
+
     for i in range (len(text) - n + 1):
         if D.get(text[i:i+n]) is None:
             D[text[i:i+n]] = 1
@@ -87,6 +92,7 @@ def get_n_gramm(n, text):
             D[text[i:i+n]] += 1
     for elem in D:
         D[elem] = D[elem]/(len(text) - n + 1)
+        prob.append(smoothing(D[elem], (len(text) - n + 1)))
     return D
 
 def dict_to_file(D, file_name):
@@ -104,8 +110,39 @@ def marcov_chain_score(deciphering_test_text, dict_frequency_training, n):
         if (c in dict_frequency_training):
             score += np.log10(dict_frequency_training[c])
         else:
-            score += np.log10(min_p/100)
+            score += np.log10(min_p/10000)
     return score
+
+
+# def new_score(deciphering_test_text, dict_frequency_training, n, new_score_prob):
+#     score = 0
+#     for i in range (len(new_score_prob)):
+#         score += np.log10(new_score_prob[i])
+#     for i in range (0, len(deciphering_test_text) - n + 1):
+#         c = deciphering_test_text[i:i+n]
+#         if (c not in dict_frequency_training):###
+#             score += 4*np.log10(1/27)
+#     return score
+
+# def marcov_chain_score_2(deciphering_test_text, dict_frequency_training, n):
+#     score = 0
+#     V = len(dict_frequency_training)
+#     alpha = 1  # параметр сглаживания
+#
+#     for i in range(0, len(deciphering_test_text) - n + 1):
+#         c = deciphering_test_text[i:i + n]
+#
+#         if c in dict_frequency_training:
+#           count = dict_frequency_training[c]
+#         else:
+#           count = 0
+#
+#         # сглаживание Лапласа
+#         probability = (count + alpha) / (len(dict_frequency_training[c[0]]) + V * alpha)
+#
+#         score += np.log10(probability)
+#
+#     return score
 
 def text_clean_and_read(name):
     file_tmp = open(name, "r", encoding="utf8")
@@ -140,7 +177,8 @@ text_training = text_clean_and_read("new_training_text.txt")
 text_test = text_clean_and_read("text_to_decode.txt")
 text_training_part = text_training #[0:10000]
 text_test_part = text_test #[0:text_len_part]
-seeD = int(input("enter the seed value: "))
+seeD = 0
+# int(input("enter the seed value: "))
 random.seed(seeD)
 alphabet = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ ')
 key = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ ')
@@ -152,16 +190,19 @@ print(deciphered_text_test)
 
 ############################
 
-text_test_part = text_test[0:100]
+text_test_part = text_test[0:830]
 enciphered_text_test = encrypt(text_test_part,key)
 print(key)
 truekey = key
 
+prob = list()
 
 n_koef = int(input("enter the n-gramm dimension: "))
-dict_frequency_training = get_n_gramm(n_koef, text_training_part)
+dict_frequency_training = get_n_gramm(n_koef, text_training_part, prob)
 min_p = np.min(list(dict_frequency_training.values()))
 dict_to_file(dict_frequency_training,"test_dict_freq.txt")
+
+new_score_prob = prob
 
 N = int(input("enter the number of repetitions: "))
 identity_score_array = np.zeros(N)
@@ -199,7 +240,7 @@ if (score_num == 1 and n_koef == 2):
         key = swap(max_key, a, b)
 
         deciphered_text_test = decrypt(enciphered_text_test, key)
-        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test)
+        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test, prob)
 
         score = use_score(score_num, dict_frequency_test, dict_frequency_training, deciphered_text_test, key, truekey, text_test_part, n_koef)
         if (score < max_score):
@@ -212,10 +253,11 @@ if (score_num == 1 and n_koef == 2):
 
         deciphered_text_test = decrypt(enciphered_text_test, max_key)
 
-        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test)
+        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test, prob)
         frequency_score_array[i] = frequency_ngram_score(dict_frequency_test, dict_frequency_training)
         hamming_distance_array[i] = hamming_distance(deciphered_text_test, text_test_part)
         marcov_chain_score_array[i] = marcov_chain_score(deciphered_text_test, dict_frequency_training, n_koef)
+        # marcov_chain_score_array[i] = new_score(deciphered_text_test, dict_frequency_training, n_koef, new_score_prob)
         if (a == 0 and b == 26):
             koef = 1
             a = -1
@@ -231,7 +273,7 @@ else:
         key = swap(max_key, a, b)
 
         deciphered_text_test = decrypt(enciphered_text_test, key)
-        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test)
+        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test, prob)
 
         score = use_score(score_num, dict_frequency_test, dict_frequency_training, deciphered_text_test, key, truekey,
                           text_test_part, n_koef)
@@ -242,10 +284,11 @@ else:
         identity_score_array[i] = identityscore(truekey, max_key)
         deciphered_text_test = decrypt(enciphered_text_test, max_key)
 
-        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test)
+        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test, prob)
         frequency_score_array[i] = frequency_ngram_score(dict_frequency_test, dict_frequency_training)
         hamming_distance_array[i] = hamming_distance(deciphered_text_test, text_test_part)
         marcov_chain_score_array[i] = marcov_chain_score(deciphered_text_test, dict_frequency_training, n_koef)
+        # marcov_chain_score_array[i] = new_score(deciphered_text_test, dict_frequency_training, n_koef, new_score_prob)
 
 
 print(deciphered_text_test)
@@ -280,9 +323,18 @@ ax4.set_xlabel('Index')
 ax4.set_ylabel('Score')
 ax4.legend()
 
-# Установите автоматическое масштабирование для каждого графика
 for ax in [ax1, ax2, ax3, ax4]:
     ax.autoscale(enable=True, axis='both', tight=False)
 
-plt.tight_layout()  # Для лучшего расположения графиков
+plt.tight_layout()
 plt.show()
+
+
+# keys = list(dict_frequency_test.keys())
+# values = list(dict_frequency_test.values())
+#
+# plt.bar(keys, values)
+# plt.title("Гистограмма на основе шифротекста")
+# plt.xlabel("Значения")
+# plt.ylabel("Частота")
+# plt.show()
