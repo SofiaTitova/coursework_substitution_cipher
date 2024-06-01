@@ -113,6 +113,26 @@ def marcov_chain_score(deciphering_test_text, dict_frequency_training, n):
             score += np.log10(min_p/10000)
     return score
 
+def probability_score(deciphering_test_text, dict_frequency_training, n):
+    p1 = deciphering_test_text[0:(n-1)]
+    p1_prob = dict_frequency_training[p1]
+    score = p1_prob
+    for i in range(0, len(deciphering_test_text) - n + 1):
+        part_3 = deciphering_test_text[i:i+n-1]
+        part_1 = deciphering_test_text[i+n-1]
+        score *= conditional_probability(deciphering_test_text, n, part_3, part_1)
+    return score
+
+def conditional_probability(deciphering_test_text, n, n_1_gramm, next):
+    count_n_1 = 0
+    count_next = 0
+    for i in range(len(deciphering_test_text) - n + 1):
+        if deciphering_test_text[i:i + n - 1] == n_1_gramm:
+            count_n_1 += 1
+            if deciphering_test_text[i + n - 1] == next:
+                count_next += 1
+    return count_next / count_n_1 if count_n_1 != 0 else 0.0
+
 
 # def new_score(deciphering_test_text, dict_frequency_training, n, new_score_prob):
 #     score = 0
