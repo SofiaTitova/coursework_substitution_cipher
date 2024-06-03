@@ -82,7 +82,7 @@ def smoothing(m, n):
     p = (m + 1)/(n + 27**4)
     return p
 
-def get_n_gramm(n, text, prob):
+def get_n_gramm_prob_score(n, text, prob):
     D = {}
 
     for i in range (len(text) - n + 1):
@@ -93,6 +93,17 @@ def get_n_gramm(n, text, prob):
     for elem in D:
         D[elem] = D[elem]/(len(text) - n + 1)
         prob.append(smoothing(D[elem], (len(text) - n + 1)))
+    return D
+
+def get_n_gramm(n, text):
+    D = {}
+    for i in range (len(text) - n + 1):
+        if D.get(text[i:i+n]) is None:
+            D[text[i:i+n]] = 1
+        else:
+            D[text[i:i+n]] += 1
+    for elem in D:
+        D[elem] = D[elem]/(len(text) - n + 1)
     return D
 
 def dict_to_file(D, file_name):
@@ -113,36 +124,65 @@ def marcov_chain_score(deciphering_test_text, dict_frequency_training, n):
             score += np.log10(min_p/10000)
     return score
 
-def probability_score(deciphering_test_text, dict_frequency_training, n):
+def probability_score(deciphering_test_text, dict_frequency_training, dict_frequency_training_prob,  n, prob):
     p1 = deciphering_test_text[0:(n-1)]
-    p1_prob = dict_frequency_training[p1]
-    score = p1_prob
+    p1_prob = dict_frequency_training_prob[p1]
+    score = np.log10(p1_prob)
+    for i in range(len(prob)):
+        score += np.log10(prob[i])
     for i in range(0, len(deciphering_test_text) - n + 1):
-        part_3 = deciphering_test_text[i:i+n-1]
-        part_1 = deciphering_test_text[i+n-1]
-        score *= conditional_probability(deciphering_test_text, n, part_3, part_1)
+        c = deciphering_test_text[i:i+n]
+        if (c not in dict_frequency_training):###
+            score += 4*np.log10(1/27)
     return score
 
-def conditional_probability(deciphering_test_text, n, n_1_gramm, next):
-    count_n_1 = 0
-    count_next = 0
-    for i in range(len(deciphering_test_text) - n + 1):
-        if deciphering_test_text[i:i + n - 1] == n_1_gramm:
-            count_n_1 += 1
-            if deciphering_test_text[i + n - 1] == next:
-                count_next += 1
-    return count_next / count_n_1 if count_n_1 != 0 else 0.0
+def n_gramm_prob(n, text):
+    D = {}
+    for i in range (len(text) - n + 1):
+        if D.get(text[i:i+n]) is None:
+            D[text[i:i+n]] = 1
+        else:
+            D[text[i:i+n]] += 1
+    return D
 
+def probability_dict(text_training_part, n, prob_n):
+    D_4  = n_gramm_prob(n, text_training_part)
+    D_3 = n_gramm_prob(n-1, text_training_part)
+    for elem in D_4:
+        D_4[elem] = D_4[elem] / D_3[elem[0:n-1]]
+        prob_n.append(smoothing(D_4[elem], D_3[elem[0:n-1]]))
+    return D_4
 
-# def new_score(deciphering_test_text, dict_frequency_training, n, new_score_prob):
-#     score = 0
-#     for i in range (len(new_score_prob)):
-#         score += np.log10(new_score_prob[i])
-#     for i in range (0, len(deciphering_test_text) - n + 1):
-#         c = deciphering_test_text[i:i+n]
-#         if (c not in dict_frequency_training):###
-#             score += 4*np.log10(1/27)
+# def probability_score(deciphering_test_text, dict_frequency_training, n):
+#     p1 = deciphering_test_text[0:(n-1)]
+#     p1_prob = dict_frequency_training[p1]
+#     score = p1_prob
+#     for i in range(0, len(deciphering_test_text) - n + 1):
+#         part_3 = deciphering_test_text[i:i+n-1]
+#         part_1 = deciphering_test_text[i+n-1]
+#         score *= conditional_probability(deciphering_test_text, n, part_3, part_1)
 #     return score
+#
+# def conditional_probability(deciphering_test_text, n, n_1_gramm, next):
+#     count_n_1 = 0
+#     count_next = 0
+#     for i in range(len(deciphering_test_text) - n + 1):
+#         if deciphering_test_text[i:i + n - 1] == n_1_gramm:
+#             count_n_1 += 1
+#             if deciphering_test_text[i + n - 1] == next:
+#                 count_next += 1
+#     return count_next / count_n_1 if count_n_1 != 0 else 0.0
+
+
+def new_score(deciphering_test_text, dict_frequency_training, n, new_score_prob):
+    score = 0
+    for i in range (len(new_score_prob)):
+        score += np.log10(new_score_prob[i])
+    for i in range (0, len(deciphering_test_text) - n + 1):
+        c = deciphering_test_text[i:i+n]
+        if (c not in dict_frequency_training):###
+            score += 4*np.log10(1/27)
+    return score
 
 # def marcov_chain_score_2(deciphering_test_text, dict_frequency_training, n):
 #     score = 0
@@ -195,7 +235,7 @@ def decrypt(code, key):
 
 text_training = text_clean_and_read("new_training_text.txt")
 text_test = text_clean_and_read("text_to_decode.txt")
-text_training_part = text_training #[0:10000]
+text_training_part = text_training #[0:2]
 text_test_part = text_test #[0:text_len_part]
 seeD = 0
 # int(input("enter the seed value: "))
@@ -210,7 +250,7 @@ print(deciphered_text_test)
 
 ############################
 
-text_test_part = text_test[0:830]
+text_test_part = text_test[0:2]
 enciphered_text_test = encrypt(text_test_part,key)
 print(key)
 truekey = key
@@ -218,7 +258,8 @@ truekey = key
 prob = list()
 
 n_koef = int(input("enter the n-gramm dimension: "))
-dict_frequency_training = get_n_gramm(n_koef, text_training_part, prob)
+dict_frequency_training = get_n_gramm_prob_score(n_koef, text_training_part, prob)
+dict_frequency_training_prob = get_n_gramm(n_koef-1, text_training_part)
 min_p = np.min(list(dict_frequency_training.values()))
 dict_to_file(dict_frequency_training,"test_dict_freq.txt")
 
@@ -233,7 +274,16 @@ max_score = 0
 
 
 score_num, max_score = select_metric(max_score)
-
+name_score = ''
+match score_num:
+        case 1:
+            name_score = 'frequency_ngram'  # frequency_ngram_score
+        case 2:
+            name_score = 'hamming_distance'  # hamming_distance(
+        case 3:
+            name_score = 'marcov_chain'  # marcov_chain_score
+        case 4:
+            name_score = 'identityscore'  # identityscore
 
 max_key = list('ABCDEFGHIJKLMNOPQRSTUVWXYZ ')
 random.shuffle(max_key)
@@ -243,6 +293,18 @@ size = 1400
 koef = 1
 a = -1
 b = a+koef
+
+prob_D = list()
+D = probability_dict(text_test_part, 2, prob_D)
+D_usl = probability_dict(text_training_part, 2, prob_D)
+lst = {}
+for c in D_usl:
+    lst[c] = D_usl[c]*dict_frequency_training_prob[c[0:1]]
+print(sorted(lst.items(), key=lambda x:x[1]))
+
+# print(sorted(D_usl.items(), key=lambda x:x[1]))
+# print(sorted(dict_frequency_training.items(), key=lambda x:x[1]))
+
 
 if (score_num == 1 and n_koef == 2):
     max_key = ' ETAOINSHRDLCUMWFGYPBVKJXQZ'
@@ -260,7 +322,7 @@ if (score_num == 1 and n_koef == 2):
         key = swap(max_key, a, b)
 
         deciphered_text_test = decrypt(enciphered_text_test, key)
-        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test, prob)
+        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test)
 
         score = use_score(score_num, dict_frequency_test, dict_frequency_training, deciphered_text_test, key, truekey, text_test_part, n_koef)
         if (score < max_score):
@@ -273,11 +335,12 @@ if (score_num == 1 and n_koef == 2):
 
         deciphered_text_test = decrypt(enciphered_text_test, max_key)
 
-        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test, prob)
+        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test)
         frequency_score_array[i] = frequency_ngram_score(dict_frequency_test, dict_frequency_training)
         hamming_distance_array[i] = hamming_distance(deciphered_text_test, text_test_part)
-        marcov_chain_score_array[i] = marcov_chain_score(deciphered_text_test, dict_frequency_training, n_koef)
-        # marcov_chain_score_array[i] = new_score(deciphered_text_test, dict_frequency_training, n_koef, new_score_prob)
+        # marcov_chain_score_array[i] = marcov_chain_score(deciphered_text_test, dict_frequency_training, n_koef)
+        # marcov_chain_score_array[i] = probability_score(deciphered_text_test, dict_frequency_training, dict_frequency_training_prob, 2, prob_D)
+        marcov_chain_score_array[i] = new_score(deciphered_text_test, dict_frequency_training, 2, new_score_prob)
         if (a == 0 and b == 26):
             koef = 1
             a = -1
@@ -293,7 +356,7 @@ else:
         key = swap(max_key, a, b)
 
         deciphered_text_test = decrypt(enciphered_text_test, key)
-        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test, prob)
+        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test)
 
         score = use_score(score_num, dict_frequency_test, dict_frequency_training, deciphered_text_test, key, truekey,
                           text_test_part, n_koef)
@@ -304,12 +367,12 @@ else:
         identity_score_array[i] = identityscore(truekey, max_key)
         deciphered_text_test = decrypt(enciphered_text_test, max_key)
 
-        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test, prob)
+        dict_frequency_test = get_n_gramm(n_koef, deciphered_text_test)
         frequency_score_array[i] = frequency_ngram_score(dict_frequency_test, dict_frequency_training)
         hamming_distance_array[i] = hamming_distance(deciphered_text_test, text_test_part)
-        marcov_chain_score_array[i] = marcov_chain_score(deciphered_text_test, dict_frequency_training, n_koef)
-        # marcov_chain_score_array[i] = new_score(deciphered_text_test, dict_frequency_training, n_koef, new_score_prob)
-
+        # marcov_chain_score_array[i] = marcov_chain_score(deciphered_text_test, dict_frequency_training, n_koef)
+        # marcov_chain_score_array[i] = probability_score(deciphered_text_test, dict_frequency_training, dict_frequency_training_prob, 2, prob_D)
+        marcov_chain_score_array[i] = new_score(deciphered_text_test, dict_frequency_training, 2, new_score_prob)
 
 print(deciphered_text_test)
 print()
@@ -346,6 +409,7 @@ ax4.legend()
 for ax in [ax1, ax2, ax3, ax4]:
     ax.autoscale(enable=True, axis='both', tight=False)
 
+fig.suptitle('Score: ' + name_score + '   Text: ' + str(len(text_test_part)) +"   "+ str(n_koef)+'-gramm')
 plt.tight_layout()
 plt.show()
 
