@@ -250,7 +250,7 @@ print(deciphered_text_test)
 
 ############################
 
-text_test_part = text_test[0:2]
+text_test_part = text_test[0:600]
 enciphered_text_test = encrypt(text_test_part,key)
 print(key)
 truekey = key
@@ -422,3 +422,6 @@ plt.show()
 # plt.xlabel("Значения")
 # plt.ylabel("Частота")
 # plt.show()
+
+
+
